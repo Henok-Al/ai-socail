@@ -26,9 +26,21 @@ const userSchema = new mongoose.Schema({
     maxlength: 500,
     default: ''
   },
+  profilePicture: {
+    type: String,
+    default: ''
+  },
   followers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  }],
+  following: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  groups: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group'
   }]
 }, {
   timestamps: true

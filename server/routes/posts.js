@@ -88,4 +88,51 @@ router.post('/posts/:id/like', auth, async (req, res) => {
   }
 });
 
+// POST /posts/:id/comment - Add a new comment to a post
+router.post('/posts/:id/comment', auth, async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const { content } = req.body;
+    const userId = req.user.id;
+    
+    // Validate comment content
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ message: 'Comment content is required' });
+    }
+    
+    // Find the post
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    
+    // Create new comment object
+    const newComment = {
+      userId,
+      content: content.trim(),
+      timestamp: new Date()
+    };
+    
+    // Add comment to post
+    post.comments.push(newComment);
+    
+    // Save the updated post
+    const updatedPost = await post.save();
+    
+    // Populate the author field and comments' userId fields
+    await updatedPost.populate([
+      { path: 'author', select: 'username email' },
+      { path: 'comments.userId', select: 'username email' }
+    ]);
+    
+    res.status(201).json({
+      message: 'Comment added successfully',
+      post: updatedPost
+    });
+  } catch (error) {
+    console.error('Add comment error:', error);
+    res.status(500).json({ message: 'Server error during comment addition' });
+  }
+});
+
 module.exports = router;
