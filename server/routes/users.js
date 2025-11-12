@@ -1,7 +1,9 @@
 const express = require('express');
 const User = require('../models/User');
 const Post = require('../models/Post');
+const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -35,15 +37,15 @@ router.get('/users/:username', auth, async (req, res) => {
 });
 
 // PUT /users/profile - Allows the authenticated user to update their bio and profilePicture fields
-router.put('/users/profile', auth, async (req, res) => {
+router.put('/users/profile', auth, upload.single('profilePicture'), async (req, res) => {
   try {
-    const { bio, profilePicture } = req.body;
+    const { bio } = req.body;
     const userId = req.user.id;
     
     // Prepare update object
     const updates = {};
     if (bio !== undefined) updates.bio = bio;
-    if (profilePicture !== undefined) updates.profilePicture = profilePicture;
+    if (req.file) updates.profilePicture = `/uploads/${req.file.filename}`;
     
     // Update user
     const updatedUser = await User.findByIdAndUpdate(
@@ -111,6 +113,30 @@ router.post('/users/:id/follow', auth, async (req, res) => {
     // Save both users
     await targetUser.save();
     await currentUser.save();
+    
+    // Send notification if it's a new follow
+    if (!isFollowing) {
+      const notification = new Notification({
+        recipient: targetUserId,
+        sender: currentUserId,
+        type: 'follow',
+        content: 'started following you'
+      });
+      
+      await notification.save();
+      
+      // Emit socket event for real-time notification
+      const io = req.app.get('socketio');
+      if (io) {
+        io.emit('new-notification', {
+          recipient: targetUserId,
+          sender: currentUserId,
+          type: 'follow',
+          content: 'started following you',
+          notificationId: notification._id
+        });
+      }
+    }
     
     res.json({
       message: isFollowing ? 'Unfollowed successfully' : 'Followed successfully',

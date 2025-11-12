@@ -4,6 +4,8 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
+const path = require('path');
+const { startScheduledPostsPublisher } = require('./utils/scheduledPostsPublisher');
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +23,9 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
+
+// Make io instance available to routes
+app.set('socketio', io);
 
 // Store connected users
 const connectedUsers = new Map();
@@ -47,6 +52,31 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('new-comment-update', data);
   });
   
+  // Handle new message event
+  socket.on('new-message', (data) => {
+    // Send message to recipient if they're online
+    const recipientId = data.recipient;
+    const recipientSocketId = connectedUsers.get(recipientId);
+    
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit('new-message-update', data);
+    }
+    
+    // Also broadcast to sender's other devices
+    socket.broadcast.emit('new-message-update', data);
+  });
+  
+  // Handle new notification event
+  socket.on('new-notification', (data) => {
+    // Send notification to recipient if they're online
+    const recipientId = data.recipient;
+    const recipientSocketId = connectedUsers.get(recipientId);
+    
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit('new-notification-update', data);
+    }
+  });
+  
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
@@ -63,6 +93,7 @@ io.on('connection', (socket) => {
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
@@ -101,8 +132,38 @@ app.use('/api', userRoutes);
 const groupRoutes = require('./routes/groups');
 app.use('/api', groupRoutes);
 
+// Conversations routes
+const conversationRoutes = require('./routes/conversations');
+app.use('/api', conversationRoutes);
+
+// Notifications routes
+const notificationRoutes = require('./routes/notifications');
+app.use('/api', notificationRoutes);
+
+// Safety routes
+const safetyRoutes = require('./routes/safety');
+app.use('/api', safetyRoutes);
+
+// Hashtags routes
+const hashtagRoutes = require('./routes/hashtags');
+app.use('/api', hashtagRoutes);
+
+// Bookmarks routes
+const bookmarkRoutes = require('./routes/bookmarks');
+app.use('/api', bookmarkRoutes);
+
+// Privacy routes
+const privacyRoutes = require('./routes/privacy');
+app.use('/api', privacyRoutes);
+
+// Stories routes
+const storyRoutes = require('./routes/stories');
+app.use('/api', storyRoutes);
+
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  // Start scheduled posts publisher
+  startScheduledPostsPublisher();
 });

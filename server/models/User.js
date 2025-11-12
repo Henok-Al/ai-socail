@@ -41,7 +41,32 @@ const userSchema = new mongoose.Schema({
   groups: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Group'
-  }]
+  }],
+  blockedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  bookmarks: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Post'
+  }],
+  privacySettings: {
+    profileVisibility: {
+      type: String,
+      enum: ['public', 'followers', 'private'],
+      default: 'public'
+    },
+    postVisibility: {
+      type: String,
+      enum: ['public', 'followers', 'private'],
+      default: 'public'
+    },
+    contactPermission: {
+      type: String,
+      enum: ['everyone', 'followers', 'none'],
+      default: 'everyone'
+    }
+  }
 }, {
   timestamps: true
 });
